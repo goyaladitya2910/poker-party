@@ -1,0 +1,27 @@
+{
+  "name": "pp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "directories": {
+    "test": "node test/test.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "build": "node build.js",
+    "test": "node test/test.js",
+    "test:integration": "node test/integration.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ws": "^8.22.2"
+  },
+  "devDependencies": {
+    "jsdom": "^31.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
