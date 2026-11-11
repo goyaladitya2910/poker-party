@@ -1,7 +1,7 @@
 'use strict';
 const assert = require('assert'), WebSocket = require('ws');
 const { Table, ev5, best, catOf, hname } = require('../engine');
-const { server } = require('../server');
+const { server, pub } = require('../server');
 const C = (s) => s.split(' ').map(x => ({ r: '23456789TJQKA'.indexOf(x[0]) + 2, s: 'shdc'.indexOf(x[1]) }));
 const out = [];
 const ok = (n, f) => Promise.resolve().then(f).then(() => out.push('PASS ' + n), e => { out.push('FAIL ' + n + ': ' + e.message); process.exitCode = 1; });
@@ -77,15 +77,16 @@ const ok = (n, f) => Promise.resolve().then(f).then(() => out.push('PASS ' + n),
     B.send(JSON.stringify({ t: 'start' })); await sl(); assert(/host/.test(last(B, 'error').msg));
     A.send(JSON.stringify({ t: 'start' })); await sl();
     const sa = last(A, 'state').s, sb = last(B, 'state').s;
-    const meA = sa.players.find(p => p.id === 'token-alice-0001'), othA = sa.players.find(p => p.id === 'token-bob-00001');
+    const meA = sa.players.find(p => p.id === pub('token-alice-0001')), othA = sa.players.find(p => p.id === pub('token-bob-00001'));
     assert(meA.hole && meA.hole.length === 2, 'owner sees own cards'); assert.equal(othA.hole, null, 'opponent cards hidden');
-    assert(!JSON.stringify(sa).includes(JSON.stringify(sb.players.find(p => p.id === 'token-bob-00001').hole)), 'no leak of opponent cards');
-    const actor = sa.to === 'token-alice-0001' ? A : B, waiter = actor === A ? B : A;
+    assert(!JSON.stringify(sa).includes(JSON.stringify(sb.players.find(p => p.id === pub('token-bob-00001')).hole)), 'no leak of opponent cards');
+    assert(!JSON.stringify(sa).includes('token-bob-00001') && !JSON.stringify(sb).includes('token-alice-0001'), 'session tokens are never sent to other players');
+    const actor = sa.to === pub('token-alice-0001') ? A : B, waiter = actor === A ? B : A;
     waiter.send(JSON.stringify({ t: 'act', type: 'call', ver: sa.ver })); await sl(); assert.equal(last(waiter, 'error').msg, 'Not your turn');
     actor.send(JSON.stringify({ t: 'act', type: 'call', ver: sa.ver - 1 })); await sl(); assert(/Stale/.test(last(actor, 'error').msg));
     // reconnect same token keeps seat and cards
     const A2 = await conn(); A.close(); A2.send(JSON.stringify({ t: 'join', code, token: 'token-alice-0001', name: 'x' })); await sl();
-    const r = last(A2, 'state').s.players.find(p => p.id === 'token-alice-0001'); assert.equal(r.hole.length, 2); assert.equal(last(A2, 'state').s.players.length, 2);
+    const r = last(A2, 'state').s.players.find(p => p.id === pub('token-alice-0001')); assert.equal(r.hole.length, 2); assert.equal(last(A2, 'state').s.players.length, 2);
     [A2, B].forEach(w => w.close()); server.close(); require('../server').rooms.forEach(rm => rm.table.stop());
   });
   console.log(out.join('\n')); setTimeout(() => process.exit(process.exitCode || 0), 100);

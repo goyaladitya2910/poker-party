@@ -111,7 +111,7 @@ function setTheme(t){document.body.dataset.theme=t;$('#bg').innerHTML=bgArt(t);t
 // ---------- state / connection ----------
 const S0={};let ST_=null,prev=null,ws=null,pend=null,CHAT=[],HOST=null,lastSt=0,off=0,snd_=true,rm=false;
 const LS=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);v===null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){return null}};
-let ID=LS('pp_token');if(!ID){ID=Array.from({length:24},()=>Math.random().toString(36)[2]).join('');LS('pp_token',ID)}
+let TOK=LS('pp_token');if(!TOK||TOK.length<16){TOK=Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>(b%36).toString(36)).join('');LS('pp_token',TOK)}let ID=null;
 let NAME=LS('pp_name')||'Player',AV=LS('pp_av')||'astro',ROOM=LS('pp_room');
 function snd(f,d=.08){if(!snd_)return;try{const c=window._ac||(window._ac=new AudioContext()),o=c.createOscillator(),g=c.createGain();o.frequency.value=f;o.type='triangle';g.gain.value=.05;g.gain.exponentialRampToValueAtTime(.001,c.currentTime+d);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+d)}catch(e){}}
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2400)}
@@ -120,14 +120,14 @@ function modal(h){$('#mb').innerHTML=h;$('#modal').classList.add('on')}
 function setConn(on){const c=$('#conn');c.textContent=on?'● online':'● reconnecting…';c.classList.toggle('off',!on)}
 function send(o){if(ws&&ws.readyState===1)ws.send(JSON.stringify(o));else toast('Reconnecting…')}
 function connect(){ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
-ws.onopen=()=>{setConn(true);if(pend){const p=pend;pend=null;ws.send(JSON.stringify(p))}else if(ROOM)ws.send(JSON.stringify({t:'join',code:ROOM,token:ID,name:NAME,av:AV}))};
+ws.onopen=()=>{setConn(true);if(pend){const p=pend;pend=null;ws.send(JSON.stringify(p))}else if(ROOM)ws.send(JSON.stringify({t:'join',code:ROOM,token:TOK,name:NAME,av:AV}))};
 ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch(x){return}
-if(m.t==='state')onState(m);else if(m.t==='error'){toast(m.msg);if(/not found|in progress/i.test(m.msg)){ROOM=null;LS('pp_room',null);if(!ST_)show('setup')}}
+if(m.t==='state'){ID=m.you;onState(m)}else if(m.t==='error'){toast(m.msg);if(/not found|in progress/i.test(m.msg)){ROOM=null;LS('pp_room',null);if(!ST_)show('setup')}}
 else if(m.t==='sticker')floatSticker(m.from,m.sticker)};
 ws.onclose=()=>{setConn(false);setTimeout(connect,1500)}}
 function ident(){NAME=($('#uname').value.trim()||'Player').slice(0,12);LS('pp_name',NAME);LS('pp_av',AV)}
-function createRoom(){ident();const o={t:'create',token:ID,name:NAME,av:AV,chips:+$('#sc').value,sb:+$('#bl').value,maxP:+$('#mp').value};pend=null;if(ws.readyState===1)ws.send(JSON.stringify(o));else{pend=o;toast('Connecting…')}}
-function joinRoom(){ident();const c=$('#code').value.trim().toUpperCase();if(c.length!==5)return toast('Enter the 5-letter code');const o={t:'join',code:c,token:ID,name:NAME,av:AV};if(ws.readyState===1)ws.send(JSON.stringify(o));else pend=o}
+function createRoom(){ident();const o={t:'create',token:TOK,name:NAME,av:AV,chips:+$('#sc').value,sb:+$('#bl').value,maxP:+$('#mp').value};pend=null;if(ws.readyState===1)ws.send(JSON.stringify(o));else{pend=o;toast('Connecting…')}}
+function joinRoom(){ident();const c=$('#code').value.trim().toUpperCase();if(c.length!==5)return toast('Enter the 5-letter code');const o={t:'join',code:c,token:TOK,name:NAME,av:AV};if(ws.readyState===1)ws.send(JSON.stringify(o));else pend=o}
 function leave(){ROOM=null;LS('pp_room',null);ST_=null;prev=null;try{ws.onclose=null;ws.close()}catch(e){}connect();show('landing')}
 function copyLink(){const u=location.origin+'/?room='+ROOM;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast('Invite link copied'),()=>modal('<h2>Invite link</h2><input readonly value="'+u+'" onclick="this.select()">'))}
 function tab(t){$('#pc').style.display=t==='c'?'':'none';$('#pj').style.display=t==='j'?'':'none';$('#tc').classList.toggle('sel',t==='c');$('#tj').classList.toggle('sel',t==='j')}

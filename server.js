@@ -7,11 +7,13 @@ const rooms = new Map();
 const server = http.createServer((req, res) => {
   let f = path.normalize(path.join(PUB, req.url.split('?')[0] === '/' ? 'index.html' : req.url.split('?')[0]));
   if (!f.startsWith(PUB) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end('Not found'); }
-  res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(res);
+  res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'SAMEORIGIN' }); fs.createReadStream(f).pipe(res);
 });
 const wss = new WebSocketServer({ server, maxPayload: 4096 });
 const send = (ws, o) => ws.readyState === 1 && ws.send(JSON.stringify(o));
 const code = () => { let c; do c = Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[crypto.randomInt(32)]).join(''); while (rooms.has(c)); return c; };
+// Public player id = one-way hash of the private session token, so tokens are never sent to other players.
+const pub = t => 'p' + crypto.createHash('sha256').update('pp-v1:' + t).digest('hex').slice(0, 15);
 const clean = (s, n) => String(s || '').replace(/[<>]/g, '').trim().slice(0, n);
 
 function mkRoom(opts, hostId) {
@@ -31,7 +33,7 @@ wss.on('connection', ws => {
     const err = e => send(ws, { t: 'error', msg: e });
     try {
       if (m.t === 'create' || m.t === 'join') {
-        id = clean(m.token, 64); if (id.length < 8) return err('Invalid session');
+        const tok = clean(m.token, 64); if (tok.length < 8) return err('Invalid session'); id = pub(tok);
         if (m.t === 'create') {
           const o = { chips: [1000, 2000, 5000].includes(+m.chips) ? +m.chips : 2000, sb: [10, 25].includes(+m.sb) ? +m.sb : 10, maxP: Math.min(10, Math.max(2, +m.maxP || 10)), fast: process.env.PP_FAST === '1' };
           room = mkRoom(o, id);
@@ -65,4 +67,4 @@ wss.on('connection', ws => {
 });
 const PORT = process.env.PORT || 3000;
 if (require.main === module) server.listen(PORT, () => console.log('POKER PARTY on :' + PORT));
-module.exports = { server, rooms };
+module.exports = { server, rooms, pub };
